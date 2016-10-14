@@ -50,11 +50,10 @@ abstract class AbstractFileConfiguration extends Configuration
      * @var array of possible configuration properties in migrations configuration.
      */
     private $configurationProperties = [
-        'migrations_namespace' => 'setMigrationsNamespace',
-        'table_name' => 'setMigrationsTableName',
-        'column_name' => 'setMigrationsColumnName',
-        'organize_migrations' => 'setMigrationOrganisation',
         'name' => 'setName',
+        'table_name' => 'setMigrationsTableName',
+        'migrations_namespace' => 'setMigrationsNamespace',
+        'organize_migrations' => 'setMigrationOrganisation',
         'migrations_directory' => 'loadMigrationsFromDirectory',
         'migrations' => 'loadMigrations',
     ];
@@ -66,11 +65,7 @@ abstract class AbstractFileConfiguration extends Configuration
                 $msg = sprintf('Migrations configuration key "%s" does not exists.', $configurationKey);
                 throw MigrationException::configurationNotValid($msg);
             }
-        }
-        foreach($this->configurationProperties as $configurationKey => $configurationSetter) {
-            if (isset($config[$configurationKey])) {
-                $this->{$configurationSetter}($config[$configurationKey]);
-            }
+            $this->{$this->configurationProperties[$configurationKey]}($configurationValue);
         }
     }
 
@@ -129,8 +124,13 @@ abstract class AbstractFileConfiguration extends Configuration
     protected function getDirectoryRelativeToFile($file, $input)
     {
         $path = realpath(dirname($file) . '/' . $input);
+        if ($path !== false) {
+            $directory = $path;
+        } else {
+            $directory = $input;
+        }
 
-        return ($path !== false) ? $path : $input;
+        return $directory;
     }
 
     public function getFile()

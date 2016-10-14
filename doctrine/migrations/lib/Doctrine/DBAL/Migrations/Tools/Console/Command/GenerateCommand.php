@@ -100,11 +100,6 @@ EOT
         $output->writeln(sprintf('Generated new migration class to "<info>%s</info>"', $path));
     }
 
-    protected function getTemplate()
-    {
-        return self::$_template;
-    }
-
     protected function generateMigration(Configuration $configuration, InputInterface $input, $version, $up = null, $down = null)
     {
         $placeHolders = [
@@ -119,7 +114,7 @@ EOT
             $up ? "        " . implode("\n        ", explode("\n", $up)) : null,
             $down ? "        " . implode("\n        ", explode("\n", $down)) : null
         ];
-        $code = str_replace($placeHolders, $replacements, $this->getTemplate());
+        $code = str_replace($placeHolders, $replacements, self::$_template);
         $code = preg_replace('/^ +$/m', '', $code);
         $migrationDirectoryHelper = new MigrationDirectoryHelper($configuration);
         $dir = $migrationDirectoryHelper->getMigrationDirectory();

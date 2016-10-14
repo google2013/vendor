@@ -66,10 +66,7 @@ You can optionally specify a <comment>--editor-cmd</comment> option to open the 
     <info>%command.full_name% --editor-cmd=mate</info>
 EOT
             )
-            ->addOption('filter-expression', null, InputOption::VALUE_OPTIONAL, 'Tables which are filtered by Regular Expression.')
-            ->addOption('formatted', null, InputOption::VALUE_NONE, 'Format the generated SQL.')
-            ->addOption('line-length', null, InputOption::VALUE_OPTIONAL, 'Max line length of unformatted lines.', 120)
-        ;
+            ->addOption('filter-expression', null, InputOption::VALUE_OPTIONAL, 'Tables which are filtered by Regular Expression.');
     }
 
     public function execute(InputInterface $input, OutputInterface $output)
@@ -102,18 +99,8 @@ EOT
             }
         }
 
-        $up = $this->buildCodeFromSql(
-            $configuration,
-            $fromSchema->getMigrateToSql($toSchema, $platform),
-            $input->getOption('formatted'),
-            $input->getOption('line-length')
-        );
-        $down = $this->buildCodeFromSql(
-            $configuration,
-            $fromSchema->getMigrateFromSql($toSchema, $platform),
-            $input->getOption('formatted'),
-            $input->getOption('line-length')
-        );
+        $up = $this->buildCodeFromSql($configuration, $fromSchema->getMigrateToSql($toSchema, $platform));
+        $down = $this->buildCodeFromSql($configuration, $fromSchema->getMigrateFromSql($toSchema, $platform));
 
         if (! $up && ! $down) {
             $output->writeln('No changes detected in your mapping information.', 'ERROR');
@@ -127,7 +114,7 @@ EOT
         $output->writeln(sprintf('Generated new migration class to "<info>%s</info>" from schema differences.', $path));
     }
 
-    private function buildCodeFromSql(Configuration $configuration, array $sql, $formatted=false, $lineLength=120)
+    private function buildCodeFromSql(Configuration $configuration, array $sql)
     {
         $currentPlatform = $configuration->getConnection()->getDatabasePlatform()->getName();
         $code = [];
@@ -135,22 +122,6 @@ EOT
             if (stripos($query, $configuration->getMigrationsTableName()) !== false) {
                 continue;
             }
-
-            if ($formatted) {
-                if (!class_exists('\SqlFormatter')) {
-                    throw new \InvalidArgumentException(
-                        'The "--formatted" option can only be used if the sql formatter is installed.'.
-                        'Please run "composer require jdorn/sql-formatter".'
-                    );
-                }
-
-                $maxLength = $lineLength - 18 - 8; // max - php code length - indentation
-
-                if (strlen($query) > $maxLength) {
-                    $query = \SqlFormatter::format($query, false);
-                }
-            }
-
             $code[] = sprintf("\$this->addSql(%s);", var_export($query, true));
         }
 

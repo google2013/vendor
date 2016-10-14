@@ -124,9 +124,7 @@ EOT
 
         if ($allOption && ($rangeFromOption !== null || $rangeToOption !== null)) {
             throw new \InvalidArgumentException('Options --all and --range-to/--range-from both used. You should use only one of them.');
-        }
-
-        if ($rangeFromOption !== null ^ $rangeToOption !== null) {
+        } elseif ($rangeFromOption !== null ^ $rangeToOption !== null) {
             throw new \InvalidArgumentException('Options --range-to and --range-from should be used together.');
         }
 
@@ -155,17 +153,17 @@ EOT
 
         $version = $this->configuration->getVersion($version);
         if ($this->markMigrated && $this->configuration->hasVersionMigrated($version)) {
+            $marked = true;
             if (! $all) {
                 throw new \InvalidArgumentException(sprintf('The version "%s" already exists in the version table.', $version));
             }
-            $marked = true;
         }
 
         if ( ! $this->markMigrated && ! $this->configuration->hasVersionMigrated($version)) {
+            $marked = false;
             if (! $all) {
                 throw new \InvalidArgumentException(sprintf('The version "%s" does not exists in the version table.', $version));
             }
-            $marked = false;
         }
 
         if ( ! isset($marked)) {

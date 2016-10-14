@@ -20,10 +20,6 @@
 namespace Doctrine\DBAL\Migrations;
 
 use Doctrine\DBAL\Migrations\Configuration\Configuration;
-use Doctrine\DBAL\Migrations\Provider\LazySchemaDiffProvider;
-use Doctrine\DBAL\Migrations\Provider\SchemaDiffProvider;
-use Doctrine\DBAL\Migrations\Provider\SchemaDiffProviderInterface;
-use ProxyManager\Factory\LazyLoadingValueHolderFactory;
 
 /**
  * Class which wraps a migration version and allows execution of the
@@ -66,6 +62,16 @@ class Version
     private $version;
 
     /**
+     * @var \Doctrine\DBAL\Schema\AbstractSchemaManager
+     */
+    private $sm;
+
+    /**
+     * @var \Doctrine\DBAL\Platforms\AbstractPlatform
+     */
+    private $platform;
+
+    /**
      * The migration instance for this version
      *
      * @var AbstractMigration
@@ -99,26 +105,16 @@ class Version
      */
     private $state = self::STATE_NONE;
 
-    /** @var SchemaDiffProviderInterface */
-    private $schemaProvider;
-
-    public function __construct(Configuration $configuration, $version, $class, SchemaDiffProviderInterface $schemaProvider=null)
+    public function __construct(Configuration $configuration, $version, $class)
     {
         $this->configuration = $configuration;
         $this->outputWriter = $configuration->getOutputWriter();
         $this->class = $class;
         $this->connection = $configuration->getConnection();
+        $this->sm = $this->connection->getSchemaManager();
+        $this->platform = $this->connection->getDatabasePlatform();
         $this->migration = new $class($this);
         $this->version = $version;
-
-        if ($schemaProvider !== null) {
-            $this->schemaProvider = $schemaProvider;
-        }
-        if($schemaProvider === null) {
-            $schemaProvider = new SchemaDiffProvider($this->connection->getSchemaManager(),
-                $this->connection->getDatabasePlatform());
-            $this->schemaProvider = LazySchemaDiffProvider::fromDefaultProxyFacyoryConfiguration($schemaProvider);
-        }
     }
 
     /**
@@ -153,15 +149,8 @@ class Version
 
     public function markMigrated()
     {
-        $this->markVersion('up');
-    }
-
-    private function markVersion($direction)
-    {
-        $action = $direction === 'up' ? 'insert' : 'delete';
-
         $this->configuration->createMigrationTable();
-        $this->connection->$action(
+        $this->connection->insert(
             $this->configuration->getMigrationsTableName(),
             [$this->configuration->getMigrationsColumnName() => $this->version]
         );
@@ -169,7 +158,11 @@ class Version
 
     public function markNotMigrated()
     {
-        $this->markVersion('down');
+        $this->configuration->createMigrationTable();
+        $this->connection->delete(
+            $this->configuration->getMigrationsTableName(),
+            [$this->configuration->getMigrationsColumnName() => $this->version]
+        );
     }
 
     /**
@@ -184,28 +177,19 @@ class Version
         if (is_array($sql)) {
             foreach ($sql as $key => $query) {
                 $this->sql[] = $query;
-                if (!empty($params[$key])) {
-                    $queryTypes = isset($types[$key]) ? $types[$key] : [];
-                    $this->addQueryParams($params[$key], $queryTypes);
+                if (isset($params[$key])) {
+                    $this->params[count($this->sql) - 1] = $params[$key];
+                    $this->types[count($this->sql) - 1] = isset($types[$key]) ? $types[$key] : [];
                 }
             }
         } else {
             $this->sql[] = $sql;
             if (!empty($params)) {
-                $this->addQueryParams($params, $types);
+                $index = count($this->sql) - 1;
+                $this->params[$index] = $params;
+                $this->types[$index]  = $types;
             }
         }
-    }
-
-    /**
-     * @param mixed[] $params Array of prepared statement parameters
-     * @param string[] $types Array of the types of each statement parameters
-     */
-    private function addQueryParams($params, $types)
-    {
-        $index = count($this->sql) - 1;
-        $this->params[$index] = $params;
-        $this->types[$index] = $types;
     }
 
     /**
@@ -219,10 +203,6 @@ class Version
     public function writeSqlFile($path, $direction = self::DIRECTION_UP)
     {
         $queries = $this->execute($direction, true);
-
-        if ( ! empty($this->params)) {
-            throw MigrationException::migrationNotConvertibleToSql($this->class);
-        }
 
         $this->outputWriter->write("\n# Version " . $this->version . "\n");
 
@@ -274,7 +254,7 @@ class Version
             $migrationStart = microtime(true);
 
             $this->state = self::STATE_PRE;
-            $fromSchema = $this->schemaProvider->createFromSchema();
+            $fromSchema = $this->sm->createSchema();
 
             $this->migration->{'pre' . ucfirst($direction)}($fromSchema);
 
@@ -286,11 +266,9 @@ class Version
 
             $this->state = self::STATE_EXEC;
 
-            $toSchema = $this->schemaProvider->createToSchema($fromSchema);
+            $toSchema = clone $fromSchema;
             $this->migration->$direction($toSchema);
-
-            $this->addSql($this->schemaProvider->getSqlDiffToMigrate($fromSchema, $toSchema));
-
+            $this->addSql($fromSchema->getMigrateToSql($toSchema, $this->platform));
             $this->executeRegisteredSql($dryRun, $timeAllQueries);
 
             $this->state = self::STATE_POST;

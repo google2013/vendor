@@ -38,16 +38,7 @@ if (!$autoloader) {
 }
 
 // Support for using the Doctrine ORM convention of providing a `cli-config.php` file.
-$directories = array(getcwd(), getcwd() . DIRECTORY_SEPARATOR . 'config');
-
-$configFile = null;
-foreach ($directories as $directory) {
-    $configFile = $directory . DIRECTORY_SEPARATOR . 'cli-config.php';
-
-    if (file_exists($configFile)) {
-        break;
-    }
-}
+$configFile = getcwd() . DIRECTORY_SEPARATOR . 'cli-config.php';
 
 $helperSet = null;
 if (file_exists($configFile)) {
@@ -57,14 +48,12 @@ if (file_exists($configFile)) {
         );
     }
 
-    $helperSet = require $configFile;
+    require $configFile;
 
-    if ( ! ($helperSet instanceof \Symfony\Component\Console\Helper\HelperSet)) {
-        foreach ($GLOBALS as $helperSetCandidate) {
-            if ($helperSetCandidate instanceof \Symfony\Component\Console\Helper\HelperSet) {
-                $helperSet = $helperSetCandidate;
-                break;
-            }
+    foreach ($GLOBALS as $helperSetCandidate) {
+        if ($helperSetCandidate instanceof \Symfony\Component\Console\Helper\HelperSet) {
+            $helperSet = $helperSetCandidate;
+            break;
         }
     }
 }

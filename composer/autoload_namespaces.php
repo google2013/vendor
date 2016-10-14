@@ -8,7 +8,6 @@ $baseDir = dirname($vendorDir);
 return array(
     'Twig_' => array($vendorDir . '/twig/twig/lib'),
     'SensioLabs\\Security' => array($vendorDir . '/sensiolabs/security-checker'),
-    'ProxyManager\\' => array($vendorDir . '/ocramius/proxy-manager/src'),
     'Pimple' => array($vendorDir . '/pimple/pimple/src'),
     'Phpmig' => array($vendorDir . '/davedevelopment/phpmig/src'),
     'PHPExcel' => array($vendorDir . '/phpoffice/phpexcel/Classes'),
